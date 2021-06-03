@@ -2,6 +2,12 @@
 
 Hiced-CMS is intended to become an open-source, higly distributed and scalable CMS based on microservices, mostly written in Go.
 
+## Table of Contents
+
+- [The hiced-cms project](#the-hiced-cms-project)
+- [Frontend components](#frontend-components)
+- [Backend components](#backend-components)
+
 ## Important disclaimer for the usage of this repository
 
 This repository has been created only with the intent of tracking the "big picture" for the hiced-cms project. Therefore, it should only be used to track:
@@ -29,3 +35,25 @@ My initial focus will be on AWS, but contributors are more than welcome to add s
 - use a lambda endpoint to recive, resize, store and link each media element correctly when a new content is loaded;
 - leverage both AWS DB offering, or a locally/remotly installed DB;
 - leverage cloudfront for URLs that are not expected to change too often.
+
+## Frontend components
+
+Frontend components are those components that are required to receive a user's request from the internet and deliver the page to her.
+
+For the first version of hiced-cms, the process will require the following interactions:
+1. a __request manager__ receives a request from the web server (such as nginx or apache), assigns it an id and posts it to the request queue;
+1. a __language validator__ picks up the oldest request from the request queue, validates the language (using the path, the domain or some other signal such as a cookie value), adds this information and posts the request to the language queue;
+1. a __path validator__ picks up the oldest request from the language queue, checks if the content id exists (issuing an error if needed) and validates the path. If the path is not canonical, a redirect response is issued. Then the requested is added to the path queue;
+1. a __response builder__ picks up the oldest request from the language queue, if it's a redirect it immediately issues a response ready event, otherwise it sends requests to the template fetcher and the content fetcher. When they respond, it builds the response payload and it issues a _response ready_ event;
+    - a __template fetcher__ receives a request for a content id, checks a cache for its template, otherwise it gets it from the DB, otherwise it updates the cache and it responds;
+    - a __content_fetcher__ receives a request for a content id, checks a cache for any contents associated to it, otherwise it gets it from the DB, otherwise it updates the cache and it responds;
+1. the __request manager__ (which has to subscribe to the _response ready_ event), receives the event, checks if the request is in its memory and, if so, it responds to the request and it forgets about it.
+
+A __logger service__ also subscribes to the _response ready_ event. It formats a line of lig and posts it to the endpoint that has been set up for it (e.g. a lambda service to store logs on Athena).
+
+## Backend components
+
+Backend components are those components that are required to manage the website, performing tasks such as:
+- creating templates;
+- writing contents;
+- managing comments.
